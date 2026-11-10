@@ -4851,6 +4851,32 @@ static int oplus_power_notifier_callback(struct notifier_block *self, unsigned l
 
 	DSI_ERR("notifier event:%d, pon_status:%d bl_lvl_backup:%d\n", event, evdata->pon_status, bl_lvl_backup);
 
+#ifdef CAIHONG_DISPLAY_DRIVER
+	if (event == OPLUS_POWER_EVENT_PON && panel->bl_ic_ktz8866_used) {
+		if (evdata->pon_status == OPLUS_PON_KPDPWR_RESIN_BARK) {
+			bl_ic_ktz8866_set_brightness(0);
+
+			mutex_lock(&panel->panel_lock);
+			dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_OFF, false);
+			mutex_unlock(&panel->panel_lock);
+
+			gpio_set_value(panel->reset_config.reset_gpio, 0);
+			DSI_INFO("AVDD/AVEE false\n");
+			bl_ic_ktz8866_set_lcd_bias_by_gpio(false);
+			usleep_range(5*1000, (5*1000)+100);
+			bl_ic_ktz8866_hw_en(false);
+			usleep_range(15*1000, (15*1000)+100);
+			DSI_INFO("VDDI lower\n");
+			dsi_pwr_enable_regulator(&panel->power_info, false);
+			panel->pon_status = OPLUS_PON_KPDPWR_RESIN_RELEASE;
+		} else if (evdata->pon_status == OPLUS_PON_KPDPWR_RESIN_RELEASE) {
+			bl_ic_ktz8866_set_brightness(bl_lvl_backup);
+		}
+
+		return 0;
+	}
+#endif /* CAIHONG_DISPLAY_DRIVER */
+
 	if (event == OPLUS_POWER_EVENT_PON) {
 		if (evdata->pon_status == OPLUS_PON_KPDPWR_RESIN_BARK) {
 			rc = dsi_panel_update_backlight(panel, 0);
